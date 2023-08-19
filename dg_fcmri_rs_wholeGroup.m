@@ -1,4 +1,4 @@
-% dg_fcmri_rs_draft
+% dg_fcmri_rs_wholeGroup
 clear all; close all; clc;
 cd('PROJECT/DIRECTORY');
 % run('dg_open_Conn_19b.m'); % LOADS SPM12 AND CONN
