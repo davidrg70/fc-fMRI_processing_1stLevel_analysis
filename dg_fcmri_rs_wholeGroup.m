@@ -8,7 +8,8 @@ addpath(genpath('updateThisDirectory/conn_19b'));
 %% FIND AND ADD functional/structural files
 % note: this will look for all data in these folders, irrespective of the specific download subsets entered as command-line arguments
 data_dir = 'PROJECT/DIRECTORY';
-cwd = 'RESULTS/DIRECTORY/fcFMRI_analysis/rs';
+cwd = 'RESULTS/DIRECTORY/fcFMRI_analysis/rs_regions';
+addpath(fullfile(data_dir, 'fcFMRI_analysis'));
 
 patients_list = {'pseudonyms'};
 controls_list = {'pseudonyms'};
@@ -16,14 +17,14 @@ controls_list = {'pseudonyms'};
 % patient's functional files (UNPROCESSED)
 pf_files = [];
 for i = 1:length(patients_list)
-    pf_files{i} = fullfile(data_dir, 'ROLANDIC', patients_list{i}, 'func', '--dataset--', [patients_list{i}, '.EPI_fMRI.rs.PA.nii.gz']);
+    pf_files{i} = fullfile(data_dir, 'ROLANDIC', patients_list{i}, 'func', '--dataset--', [patients_list{i}, '.EPI_fMRI.rs.PA.nii']);
 end
 pf_files = pf_files';
 
 % control's functional files (UNPROCESSED)
 cf_files = [];
 for i = 1:length(controls_list)
-    cf_files{i} = fullfile(data_dir, 'CONTROLS', controls_list{i}, 'func', '--dataset--', [controls_list{i}, '.EPI_fMRI.rs.PA.nii.gz']);
+    cf_files{i} = fullfile(data_dir, 'CONTROLS', controls_list{i}, 'func', '--dataset--', [controls_list{i}, '.EPI_fMRI.rs.PA.nii']);
 end
 cf_files = cf_files';
 
@@ -64,7 +65,7 @@ TR = 1.4; % Repetition time
 %% CONN-SPECIFIC SECTION: RUNS PREPROCESSING/SETUP/DENOISING/ANALYSIS STEPS
 % Prepares batch structure
 clear batch;
-batch.filename=fullfile(cwd,'rs.mat');            % New conn_*.mat experiment name
+batch.filename=fullfile(cwd,'rs_regions.mat');            % New conn_*.mat experiment name
 
 % SETUP & PREPROCESSING step (using default values for most parameters, see help conn_batch to define non-default values)
 % CONN Setup                                            % Default options (uses all ROIs in conn/rois/ directory); see conn_batch for additional options
@@ -124,7 +125,14 @@ else
     end % session-specific conditions
 end
 
+% Setup ROIs (all anatomical regions, without networks -- Harvard-Oxford atlas)
+batch.Setup.rois.files = {fullfile(conn_folder, 'rois', 'atlas.nii')};
+load(fullfile(data_dir, 'fcFMRI_analysis', 'ROIs')); % load the ROIs I saved from conn_folder = '/home/uni10/nmri/tools/conn/conn_19b';
+batch.Setup.rois.names = ROIs.Regions; % just call the struct field, since I saved it as CELL before
+batch.Setup.rois.networks = 0;  % Ensure to turn off network-level analysis
+
 batch.Setup.preprocessing.steps='default_mni'; % RUNS DEFAULT MNI PROCESSING, AVAILABLE IN CONN
+% batch.Setup.preprocessing.steps = setdiff(batch.Setup.preprocessing.steps, {'functional_realign&unwarp', 'functional_slice-timing'}); % Remove Realignment & Slice-timing correction steps (SINCE DATA ALREADY PREPROCESSED WITH TOPUP+MCFLIRT WAS SELECTED)
 batch.Setup.preprocessing.sliceorder='interleaved (Siemens)';
 batch.Setup.done=1;
 batch.Setup.overwrite='Yes';
@@ -132,7 +140,7 @@ batch.Setup.overwrite='Yes';
 % Run one step at a time:
 % conn_batch(batch); % runs Preprocessing and Setup steps only
 % clear batch;
-% batch.filename=fullfile(cwd,'rs.mat');            % Existing conn_*.mat experiment name
+% batch.filename=fullfile(cwd,'rs_regions.mat');            % Existing conn_*.mat experiment name
 
 %% DENOISING step
 % CONN Denoising                                    % Default options (uses White Matter+CSF+realignment+scrubbing+conditions as confound regressors); see conn_batch for additional options
@@ -143,12 +151,22 @@ batch.Denoising.overwrite='Yes';
 % Run one step at a time:
 % conn_batch(batch); % runs Denoising step only
 % clear batch;
-% batch.filename=fullfile(cwd,'rs.mat');            % Existing conn_*.mat experiment name
+% batch.filename=fullfile(cwd,'rs_regions.mat');            % Existing conn_*.mat experiment name
 
-%% FIRST-LEVEL ANALYSIS step
-% CONN Analysis                                     % Default options (uses all ROIs in conn/rois/ as connectivity sources); see conn_batch for additional options
-batch.Analysis.done=1;
-batch.Analysis.overwrite='Yes';
+%% FIRST-LEVEL ANALYSIS (SCRIPTED) AND SECOND-LEVEL ANALYSIS (TO DO IN GUI)
+% **First-level Analysis - Default options for (except that uses previously defined ROIs as connectivity sources)
+batch.Analysis.done = 1;
+batch.Analysis.overwrite = 'Yes';
+batch.Analysis.name = 'S2V_R2R'; % Seed-to-Voxel & Weighted ROI-to-ROI
+batch.Analysis.measure = 1;     % connectivity measure used, 1='correlation (bivariate)', 2='correlation (semipartial)', 
+                                % 3='regression (bivariate)', 4='regression (multivariate)'; [1] 
+batch.Analysis.weight = 2;      % within-condition weight, 1 = 'none', 2 = 'hrf', 3 = 'hanning'; [2]
+batch.Analysis.modulation = 0;  % temporal modulation, 0 = standard weighted GLM analyses; 1 = gPPI analyses of condition-specific 
+                                % temporal modulation factor, or a string for PPI analyses of other temporal modulation factor 
+                                % (same for all conditions; valid strings are ROI names and 1st-level covariate names)'; [0]
+batch.Analysis.conditions = []; % (for modulation==1 only) list of task condition names to be simultaneously entered in gPPI 
+                                % model (leave empty for default 'all existing conditions') []
+batch.Analysis.type = 3;        % analysis type, 1 = 'ROI-to-ROI', 2 = 'Seed-to-Voxel', 3 = 'all'; [3]
 
 % Run ALL analyses
 conn_batch(batch);
@@ -156,5 +174,5 @@ conn_batch(batch);
 % CONN Display
 % launches conn gui to explore results AND RUN 2nd LEVEL ANALYSIS WITH GUI
 conn
-conn('load',fullfile(cwd,'rs.mat'));
+conn('load',fullfile(cwd,'rs_regions.mat'));
 conn gui_results
