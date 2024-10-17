@@ -137,7 +137,9 @@ batch.Setup.overwrite='Yes';
 
 %% DENOISING step
 % CONN Denoising                                    % Default options (uses White Matter+CSF+realignment+scrubbing+conditions as confound regressors); see conn_batch for additional options
-batch.Denoising.filter=[0.01, 0.1];                 % frequency filter (band-pass values, in Hz)
+batch.Denoising.filter=[0.008, 0.2];    % frequency filter (band-pass values, in Hz)
+                                        % best for resting-state: low-frequency focused filter (0.008-0.1 Hz)
+                                        % best for task-based: a high-pass filter (0.008-0.2) keeps the higher-frequency information, more related to BOLD during the events/blocks (more frequent fluctuations)
 batch.Denoising.done=1;
 batch.Denoising.overwrite='Yes';
 
